@@ -47,9 +47,15 @@ if [ -n "$FFTOOLS_DIR" ]; then
     
     # Check if we already patched it to avoid duplicate definitions
     if ! grep -q "int64_t av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
-        echo "Appending dummy implementation of av_stream_get_end_pts used by ffmpeg.c..."
-        # Append the missing function definition to the end of the file.
-        # It's an internal function usually found in libavformat/internal.h, but absent in our static build.
+        echo "Appending dummy implementation of av_stream_get_end_pts..."
+        
+        # 1. Inject FORWARD DECLARATION at the top (after includes) to avoid implicit declaration error
+        # We insert after the last #include to be safe (around line 100 usually, or just after config.h)
+        # Using sed to insert after the first few lines is risky if includes change.
+        # Let's try inserting after '#include "libavutil/time.h"' which should be present.
+        sed -i '/#include "libavutil\/time.h"/a int64_t av_stream_get_end_pts(const AVStream *st);' "$FFTOOLS_DIR/ffmpeg.c"
+
+        # 2. Append IMPLEMENTATION at the bottom
         cat >> "$FFTOOLS_DIR/ffmpeg.c" <<EOF
 
 // [MediaKit Patch] Dummy implementation for missing internal symbol in static build
