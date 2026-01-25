@@ -44,7 +44,7 @@ fi
 
 if [ -n "$FFTOOLS_DIR" ]; then
     echo "Patching $FFTOOLS_DIR/ffmpeg.c for av_stream_get_end_pts..."
-    sed -i 's/av_stream_get_end_pts(st)/AV_NOPTS_VALUE/g' "$FFTOOLS_DIR/ffmpeg.c"
+    sed -i 's/av_stream_get_end_pts([^)]*)/AV_NOPTS_VALUE/g' "$FFTOOLS_DIR/ffmpeg.c"
     
     # Also patch avcodec_get_name if needed (usually handled elsewhere but safe to ensure)
     sed -i 's/avcodec_get_name/avcodec_get_name_null/g' "$FFTOOLS_DIR/ffmpeg_filter.c" || true
