@@ -37,9 +37,10 @@ done
 if [ -d "deps/fftools_ffi" ]; then
     echo "Applying manual fix for fftools_ffi (av_stream_get_end_pts)..."
     cd deps/fftools_ffi
-    if [ -f "ffmpeg.c" ] && ! grep -q "define av_stream_get_end_pts" ffmpeg.c; then
-        sed -i '/#include "libavutil\/avassert.h"/a #define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)' ffmpeg.c
-    fi
+    # Always try to patch, use safer anchor
+    sed -i '/#include "ffmpeg.h"/a #define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)' ffmpeg.c
+    echo "Patch applied to ffmpeg.c:"
+    grep "av_stream_get_end_pts" ffmpeg.c || echo "ERROR: Patch failed!"
     cd $ROOT
 fi
 
