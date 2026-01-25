@@ -44,6 +44,19 @@ cp ../../prefix/armeabi-v7a/usr/local/lib/libmpv.so    app/build/outputs/apk/rel
 cp ../../prefix/x86/usr/local/lib/libmpv.so            app/build/outputs/apk/release/lib/x86
 cp ../../prefix/x86_64/usr/local/lib/libmpv.so         app/build/outputs/apk/release/lib/x86_64
 
+# Copy libc++_shared.so
+NDK_ROOT=../../sdk/android-sdk-linux/ndk/$v_ndk
+TOOLCHAIN=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64
+copy_stl() {
+  ARCH=$1
+  TRIPLE=$2
+  cp "$TOOLCHAIN/sysroot/usr/lib/$TRIPLE/libc++_shared.so" "app/build/outputs/apk/release/lib/$ARCH/"
+}
+copy_stl arm64-v8a aarch64-linux-android
+copy_stl armeabi-v7a arm-linux-androideabi
+copy_stl x86 i686-linux-android
+copy_stl x86_64 x86_64-linux-android
+
 cd app/build/outputs/apk/release
 
 zip -r default-arm64-v8a.jar      lib/arm64-v8a/*.so
