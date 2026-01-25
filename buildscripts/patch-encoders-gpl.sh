@@ -43,11 +43,11 @@ elif [ -d "deps/fftools_ffi" ]; then
 fi
 
 if [ -n "$FFTOOLS_DIR" ]; then
-    echo "Patching $FFTOOLS_DIR/fftools/ffmpeg.c for av_stream_get_end_pts..."
-    sed -i 's/av_stream_get_end_pts(st)/AV_NOPTS_VALUE/g' "$FFTOOLS_DIR/fftools/ffmpeg.c"
+    echo "Patching $FFTOOLS_DIR/ffmpeg.c for av_stream_get_end_pts..."
+    sed -i 's/av_stream_get_end_pts(st)/AV_NOPTS_VALUE/g' "$FFTOOLS_DIR/ffmpeg.c"
     
     # Also patch avcodec_get_name if needed (usually handled elsewhere but safe to ensure)
-    sed -i 's/avcodec_get_name/avcodec_get_name_null/g' "$FFTOOLS_DIR/fftools/ffmpeg_filter.c" || true
+    sed -i 's/avcodec_get_name/avcodec_get_name_null/g' "$FFTOOLS_DIR/ffmpeg_filter.c" || true
 else
     echo "WARNING: fftools-ffi directory not found, skipping av_stream_get_end_pts patch."
 fi
