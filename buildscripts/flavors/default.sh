@@ -253,6 +253,7 @@ cpuflags=
 	--enable-encoder=jpegls \
 	\
 	--enable-network \
+|| { echo "=== FFmpeg configure failed, showing config.log ==="; cat ffbuild/config.log | tail -200; exit 1; } \
 
 make -j$cores
 make DESTDIR="$prefix_dir" install
