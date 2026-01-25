@@ -24,6 +24,8 @@ if [ -f audio/out/ao_aaudio.c ]; then
 fi
 
 meson setup $build --cross-file "$prefix_dir"/crossfile.txt \
+	-Dc_link_args="-lc++_shared" \
+	-Dcpp_link_args="-lc++_shared" \
 	--prefer-static \
 	--default-library shared \
 	-Dgpl=false \
