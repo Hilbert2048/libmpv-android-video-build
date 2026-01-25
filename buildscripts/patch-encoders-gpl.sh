@@ -44,8 +44,23 @@ fi
 
 if [ -n "$FFTOOLS_DIR" ]; then
     echo "Patching $FFTOOLS_DIR/ffmpeg.c for av_stream_get_end_pts..."
-    sed -i 's/av_stream_get_end_pts([^)]*)/AV_NOPTS_VALUE/g' "$FFTOOLS_DIR/ffmpeg.c"
     
+    # Check if we already patched it to avoid duplicate definitions
+    if ! grep -q "int64_t av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
+        echo "Appending dummy implementation of av_stream_get_end_pts used by ffmpeg.c..."
+        # Append the missing function definition to the end of the file.
+        # It's an internal function usually found in libavformat/internal.h, but absent in our static build.
+        cat >> "$FFTOOLS_DIR/ffmpeg.c" <<EOF
+
+// [MediaKit Patch] Dummy implementation for missing internal symbol in static build
+int64_t av_stream_get_end_pts(const AVStream *st) {
+    return AV_NOPTS_VALUE; 
+}
+EOF
+    else
+        echo "av_stream_get_end_pts implementation already present."
+    fi
+
     # Also patch avcodec_get_name if needed (usually handled elsewhere but safe to ensure)
     sed -i 's/avcodec_get_name/avcodec_get_name_null/g' "$FFTOOLS_DIR/ffmpeg_filter.c" || true
 else
