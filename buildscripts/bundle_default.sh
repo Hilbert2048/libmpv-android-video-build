@@ -10,6 +10,7 @@ fi
 
 ./download.sh
 ./patch.sh
+./patch-encoders-gpl.sh
 
 # --------------------------------------------------
 

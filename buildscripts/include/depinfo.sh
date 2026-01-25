@@ -42,6 +42,6 @@ dep_libplacebo=(shaderc)
 if [ -n "${ENCODERS_GPL+x}" ]; then
 	dep_mpv=(ffmpeg libass libplacebo fftools_ffi)
 else
-	dep_mpv=(ffmpeg libass libplacebo)
+	dep_mpv=(ffmpeg libass libplacebo fftools_ffi)
 fi
 
