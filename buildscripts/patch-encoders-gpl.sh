@@ -36,19 +36,26 @@ done
 # Fix fftools_ffi compatibility with FFmpeg 7.1 (av_stream_get_end_pts removed)
 # We replace the function call with AV_NOPTS_VALUE because the function is missing in static builds
 FFTOOLS_DIR=""
-if [ -d "deps/fftools-ffi" ]; then
-    FFTOOLS_DIR="deps/fftools-ffi"
-elif [ -d "deps/fftools_ffi" ]; then
+
+echo "Searching for fftools directory..."
+# Order matters: check the one we expect more likely first, but check all.
+if [ -d "deps/fftools_ffi" ]; then
     FFTOOLS_DIR="deps/fftools_ffi"
+elif [ -d "deps/fftools-ffi" ]; then
+    FFTOOLS_DIR="deps/fftools-ffi"
+# Fallback search if exact names don't match
+else
+    echo "WARNING: Standard directories not found. Searching wildcard..."
+    FFTOOLS_DIR=$(find deps -maxdepth 1 -type d -name "fftools*" | head -n 1)
 fi
 
-echo "Checking for fftools-ffi directory..."
 if [ -n "$FFTOOLS_DIR" ]; then
     echo "Found fftools directory at: $FFTOOLS_DIR"
     echo "Patching $FFTOOLS_DIR/ffmpeg.c for av_stream_get_end_pts..."
     
     if [ ! -f "$FFTOOLS_DIR/ffmpeg.c" ]; then
          echo "ERROR: $FFTOOLS_DIR/ffmpeg.c does not exist!"
+         ls -R "$FFTOOLS_DIR" || true
          exit 1
     fi
 
@@ -56,15 +63,18 @@ if [ -n "$FFTOOLS_DIR" ]; then
     if ! grep -q "int64_t av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
         echo "Appending dummy implementation of av_stream_get_end_pts to $FFTOOLS_DIR/ffmpeg.c..."
         
-        # 1. Inject FORWARD DECLARATION at the top (after includes) to avoid implicit declaration error
-        # We insert after the last #include to be safe (around line 100 usually, or just after config.h)
-        # Using sed to insert after the first few lines is risky if includes change.
-        # Let's try inserting after '#include "libavutil/time.h"' which should be present.
+        # 1. Inject FORWARD DECLARATION
+        # We look for a safe inclusion point. 'include "config.h"' is usually the first.
+        # Or just after the last include.
+        # Using a marker that is definitely there.
         if grep -q '#include "libavutil/time.h"' "$FFTOOLS_DIR/ffmpeg.c"; then
-            sed -i '/#include "libavutil\/time.h"/a int64_t av_stream_get_end_pts(const AVStream *st);' "$FFTOOLS_DIR/ffmpeg.c"
-            echo "Inserted forward declaration."
+             # Match exact line to avoid issues
+             sed -i 's|#include "libavutil/time.h"|#include "libavutil/time.h"\nint64_t av_stream_get_end_pts(const AVStream *st);|g' "$FFTOOLS_DIR/ffmpeg.c"
+             echo "Inserted forward declaration after libavutil/time.h."
         else
-            echo "WARNING: Could not find '#include \"libavutil/time.h\"' to insert forward declaration. Appending to end only."
+             echo "WARNING: Could not find '#include \"libavutil/time.h\"'. Trying to insert after last #include..."
+             # Insert after the last #include line
+             sed -i '$!N;s/#include.*\n/#include&\nint64_t av_stream_get_end_pts(const AVStream *st);\n/;P;D' "$FFTOOLS_DIR/ffmpeg.c" || echo "Failed to insert forward decl via sed."
         fi
 
         # 2. Append IMPLEMENTATION at the bottom
@@ -82,6 +92,8 @@ EOF
             echo "SUCCESS: av_stream_get_end_pts found in ffmpeg.c after patching."
         else
             echo "ERROR: Failed to patch ffmpeg.c (grep check failed after patch)."
+            # dump file tail to see what happened
+            tail -n 20 "$FFTOOLS_DIR/ffmpeg.c"
             exit 1
         fi
     else
@@ -91,8 +103,9 @@ EOF
     # Also patch avcodec_get_name if needed (usually handled elsewhere but safe to ensure)
     sed -i 's/avcodec_get_name/avcodec_get_name_null/g' "$FFTOOLS_DIR/ffmpeg_filter.c" || true
 else
-    echo "WARNING: fftools-ffi directory not found, skipping av_stream_get_end_pts patch."
+    echo "ERROR: fftools-ffi directory not found!"
     ls -l deps/ || true
+    exit 1
 fi
 
 exit 0
