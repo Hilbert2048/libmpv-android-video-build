@@ -18,6 +18,7 @@ cp ../../scripts/libx264.build meson.build
 
 unset CC CXX # meson wants these unset
 
+rm -rf $build
 mkdir $build
 
 # Stripping breaks the asm ELF metadata within libx264.a
