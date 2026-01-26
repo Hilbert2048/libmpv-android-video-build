@@ -74,49 +74,41 @@ if [ -n "$FFTOOLS_DIR" ]; then
     head -n 20 "$FFTOOLS_DIR/ffmpeg.c"
     echo "------------------------------------"
 
+
     # Check if we already patched it to avoid duplicate definitions
-    if ! grep -q "int64_t av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
-        echo "Appending dummy implementation of av_stream_get_end_pts to $FFTOOLS_DIR/ffmpeg.c..."
+    if ! grep -q "define av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
+        echo "Applying macro definition of av_stream_get_end_pts to $FFTOOLS_DIR/ffmpeg.c..."
         
-        # 1. Inject FORWARD DECLARATION
-        echo "Injecting forward declaration..."
-        if grep -q '#include "libavutil/time.h"' "$FFTOOLS_DIR/ffmpeg.c"; then
-             # Match exact line to avoid issues
-             # Use a temporary file to ensure atomic write and avoid sed quirks in some envs
-             sed 's|#include "libavutil/time.h"|#include "libavutil/time.h"\nint64_t av_stream_get_end_pts(const AVStream *st);|g' "$FFTOOLS_DIR/ffmpeg.c" > "$FFTOOLS_DIR/ffmpeg.c.tmp" && mv "$FFTOOLS_DIR/ffmpeg.c.tmp" "$FFTOOLS_DIR/ffmpeg.c"
-             echo "Inserted forward declaration after libavutil/time.h."
+        # 1. Inject MACRO DEFINITION
+        echo "Injecting macro..."
+        if grep -q '#include "ffmpeg.h"' "$FFTOOLS_DIR/ffmpeg.c"; then
+             # Insert after #include "ffmpeg.h"
+             # Use a temporary file to ensure atomic write
+             sed 's|#include "ffmpeg.h"|#include "ffmpeg.h"\n#define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)|g' "$FFTOOLS_DIR/ffmpeg.c" > "$FFTOOLS_DIR/ffmpeg.c.tmp" && mv "$FFTOOLS_DIR/ffmpeg.c.tmp" "$FFTOOLS_DIR/ffmpeg.c"
+             echo "Inserted macro definition after ffmpeg.h."
         else
-             echo "WARNING: Could not find '#include \"libavutil/time.h\"'. Trying to insert after last #include..."
+             echo "WARNING: Could not find '#include \"ffmpeg.h\"'. Trying to insert after last #include..."
              # Insert after the last #include line
-             sed '$!N;s/#include.*\n/#include&\nint64_t av_stream_get_end_pts(const AVStream *st);\n/;P;D' "$FFTOOLS_DIR/ffmpeg.c" > "$FFTOOLS_DIR/ffmpeg.c.tmp" && mv "$FFTOOLS_DIR/ffmpeg.c.tmp" "$FFTOOLS_DIR/ffmpeg.c" || echo "Failed to insert forward decl via sed."
+             sed '$!N;s/#include.*\n/#include&\n#define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)\n/;P;D' "$FFTOOLS_DIR/ffmpeg.c" > "$FFTOOLS_DIR/ffmpeg.c.tmp" && mv "$FFTOOLS_DIR/ffmpeg.c.tmp" "$FFTOOLS_DIR/ffmpeg.c" || echo "Failed to insert macro via sed."
         fi
-
-        # 2. Append IMPLEMENTATION at the bottom
-        echo "Appending implementation..."
-        cat >> "$FFTOOLS_DIR/ffmpeg.c" <<EOF
-
-// [MediaKit Patch] Dummy implementation for missing internal symbol in static build
-int64_t av_stream_get_end_pts(const AVStream *st) {
-    return AV_NOPTS_VALUE; 
-}
-EOF
-        echo "Appended implementation."
         
         # Verify
         echo "Verifying patch application..."
-        if grep -q "int64_t av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
-            echo "SUCCESS: av_stream_get_end_pts found in ffmpeg.c after patching."
+        if grep -q "define av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"; then
+            echo "SUCCESS: av_stream_get_end_pts MACRO found in ffmpeg.c after patching."
             echo "--- ffmpeg.c TAIL (after patch) ---"
-            tail -n 20 "$FFTOOLS_DIR/ffmpeg.c"
+            # We look at the place where we patched, which is near the top (around line 100), not the tail.
+            # But let's show grep context
+            grep -C 2 "define av_stream_get_end_pts" "$FFTOOLS_DIR/ffmpeg.c"
             echo "-----------------------------------"
         else
             echo "ERROR: Failed to patch ffmpeg.c (grep check failed after patch)."
-            echo "--- ffmpeg.c TAIL (failed patch) ---"
-            tail -n 20 "$FFTOOLS_DIR/ffmpeg.c"
+            echo "--- ffmpeg.c HEAD (failed patch) ---"
+            head -n 150 "$FFTOOLS_DIR/ffmpeg.c"
             exit 1
         fi
     else
-        echo "av_stream_get_end_pts implementation already present. Skipping."
+        echo "av_stream_get_end_pts macro already present. Skipping."
     fi
 
     # Also patch avcodec_get_name if needed (usually handled elsewhere but safe to ensure)
