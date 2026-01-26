@@ -18,35 +18,14 @@ unset CC CXX # meson wants these unset
 
 
 # [MediaKit Patch] Apply fix for av_stream_get_end_pts directly in build script
-echo "================================================================="
-echo " FORENSIC LOGGING: PATCHING IN fftools_ffi.sh"
-echo "PWD: $(pwd)"
-echo "Listing current directory:"
-ls -F
-
 if [ -f "ffmpeg.c" ]; then
-    echo "ffmpeg.c found. Checking for macro..."
     if ! grep -q "define av_stream_get_end_pts" "ffmpeg.c"; then
-        echo "Applying macro definition..."
         # Force insert after config.h
         if grep -q '#include "config.h"' "ffmpeg.c"; then
              sed 's|#include "config.h"|#include "config.h"\n#define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)|g' "ffmpeg.c" > "ffmpeg.c.tmp" && mv "ffmpeg.c.tmp" "ffmpeg.c"
-             echo "Inserted macro definition after config.h."
         else
-             echo "WARNING: config.h not found. Inserting at line 2."
              sed '2i #define av_stream_get_end_pts(st) ((st)->duration != AV_NOPTS_VALUE ? (st)->start_time + (st)->duration : AV_NOPTS_VALUE)' "ffmpeg.c" > "ffmpeg.c.tmp" && mv "ffmpeg.c.tmp" "ffmpeg.c"
         fi
-        
-        # Verify
-        if grep -q "define av_stream_get_end_pts" "ffmpeg.c"; then
-            echo "SUCCESS: Macro injected."
-            head -n 20 "ffmpeg.c"
-        else
-            echo "ERROR: Macro injection failed!"
-            exit 1
-        fi
-    else
-        echo "Macro already present."
     fi
     
     # Also patch avcodec_get_name if needed
@@ -57,7 +36,7 @@ else
     echo "ERROR: ffmpeg.c not found in $(pwd)"
     exit 1
 fi
-echo "================================================================="
+
 
 CFLAGS=-fPIC CXXFLAGS=-fPIC meson setup $build --cross-file "$prefix_dir"/crossfile.txt
 
